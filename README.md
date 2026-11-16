@@ -41,11 +41,11 @@
 
 - **Line breaks:** a PDF stores text line by line, so copying from it breaks sentences at every wrap. The tailor skill also writes a plain `.txt` with whole paragraphs, for application form boxes.
 - **Chip separators:** chips sitting on one line come out as "Lottie Files Figma Weave" in pasted text. A transparent comma after each chip fixes that without changing the layout.
+- **Do not position the separator:** `position:absolute` or `relative` moves the chip text to the end of the PDF text stream, so Skills and Tools headings end up far from their chips. Keep it inline.
 - **Honest limit:** I tested this by exporting a PDF with Chromium and reading it with `pdftotext`. I did not test it against any specific ATS, and hidden punctuation could in theory be flagged by a tool that hates hidden text.
 
 ```css
-.chip{position:relative}
-.chip .sep{position:absolute;right:4pt;top:0;line-height:var(--chip-h);white-space:nowrap;color:transparent}
+.chip .sep{display:inline-block;width:0;overflow:visible;white-space:nowrap;color:transparent}
 ```
 
 ```html
