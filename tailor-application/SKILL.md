@@ -89,7 +89,7 @@ Work on the device through its shell, in `[YOUR APPLICATIONS FOLDER]`.
 2. **Duplicate, never edit in place.** Copy `BASE CV.html` into that folder as `<Company> - [YOUR NAME] - <Position>.html`. That naming format is fixed. Always copy from `BASE CV.html` in the Applications root, never from the file built for the previous role in the queue. Use `cp -n`, and if a file of that name is already in the folder, say so in one line and stop for that role, unless the user asked for a redo; then copy over it with plain `cp`.
    The cover letter, when there is one, is duplicated into this same folder in Step 5. The whole application, CV, letter and the PDFs the user exports later, lives in this one folder.
 3. **Inspect the real markup before writing any edit.** Find each target line with grep and read its surrounding block. The file's structure is not what a plain-text CV would suggest:
-   - Skills and Tools are `<span class="chip">` elements, one per line, not comma-separated text. A Skills change means rewriting the chip block.
+   - Skills and Tools are `<span class="chip">` elements, one per line. Every chip except the last in a block carries a hidden separator, `<span class="sep">,</span>`, so pasted or parsed text reads "Figma, After Effects" and not "Figma After Effects". A Skills change means rewriting the chip block, and the rewritten block keeps a separator after every chip but the last.
    - The role appears twice: `<title>` in the head and `<p class="job-title">` in the masthead. Both change.
    - The location sits in `<p class="contact">` after the `<br>`, as `[YOUR HOME CITY, COUNTRY] | [YOUR PHONE]`. If you use the relocation rule, that `old` string becomes `[YOUR HOME CITY, COUNTRY], open to relocate to [TARGET CITY] | [YOUR PHONE]`.
    - An HTML comment block near the top explains how to edit the file and contains example markup. Ignore it; it does not render.
@@ -99,9 +99,98 @@ Work on the device through its shell, in `[YOUR APPLICATIONS FOLDER]`.
    - hold each edit as an exact old/new string pair taken from the file as it actually reads,
    - assert each `old` occurs exactly once, since labels like `Product Experience:` repeat across jobs,
    - count `<a href="http` before and after and require the two to match,
+   - check every chip block: a `<span class="sep">,</span>` after each chip except the last,
    - abort without writing if any assertion fails, printing which edit failed.
    Never rebuild the file's contents from tool output, which can be truncated.
 6. **Verify by looking at it.** Stage the file and render it to a full-page screenshot, then actually view the image. Check the masthead role, the chip rows, every rewritten bullet, and that links still render as links.
+7. **Write the paste-ready text version.** A PDF stores text as separate lines, so copying from it breaks every sentence at the page's wraps, which shows when the text goes into an application form box. Build the `.txt` from the finished CV file with the script below, and save it in the role folder as `<Company> - [YOUR NAME] - <Position>.txt`. It writes whole paragraphs, puts each chip block on one comma-separated line, and skips the hidden separators. Save the script outside the connected folder and run `python3 -I cv_to_text.py "<cv.html>" "<out.txt>"`. Then compare the words in the text against the PDF or the HTML (nothing missing, nothing extra) before reporting it done.
+
+   ```python
+   """Turn the CV html into paste-ready plain text: whole paragraphs, chips on one line.
+
+   Usage: python3 -I cv_to_text.py <cv.html> <out.txt>
+   """
+   import re
+   import sys
+   from html.parser import HTMLParser
+
+
+   def tidy(s):
+       return re.sub(r"\s+", " ", s).strip()
+
+
+   class CV(HTMLParser):
+       def __init__(self):
+           super().__init__(convert_charrefs=True)
+           self.lines, self.buf, self.stack = [], [], []
+           self.skip = self.sep = 0
+           self.chips = None
+           self.chip = None
+
+       def gap(self):
+           if self.lines and self.lines[-1] != "":
+               self.lines.append("")
+
+       def flush(self, fmt=str):
+           text = tidy("".join(self.buf))
+           self.buf = []
+           if text:
+               self.lines.append(fmt(text))
+
+       def handle_starttag(self, tag, attrs):
+           cls = (dict(attrs).get("class") or "").split()
+           self.stack.append((tag, cls))
+           if tag in ("style", "script", "title"):
+               self.skip += 1
+           elif "sep" in cls:
+               self.sep += 1
+           elif "chip" in cls:
+               self.chip = []
+           elif tag == "br" or tag in ("p", "h1", "li"):
+               self.flush()
+           elif "bar" in cls:
+               self.flush()
+               self.gap()
+           elif "chips" in cls:
+               self.chips = []
+           elif "role" in cls:
+               self.flush()
+               self.gap()
+
+       def handle_endtag(self, tag):
+           _, cls = self.stack.pop() if self.stack else (tag, [])
+           if tag in ("style", "script", "title"):
+               self.skip -= 1
+           elif "sep" in cls:
+               self.sep -= 1
+           elif "chip" in cls:
+               self.chips.append(tidy("".join(self.chip)))
+               self.chip = None
+           elif "chips" in cls:
+               self.lines.append(", ".join(self.chips))
+               self.chips = None
+           elif "bar" in cls:
+               self.flush(str.upper)
+           elif "role" in cls or tag in ("p", "h1"):
+               self.flush()
+           elif tag == "li":
+               self.flush(lambda t: "- " + t)
+
+       def handle_data(self, data):
+           if self.skip or self.sep:
+               return
+           (self.chip if self.chip is not None else self.buf).append(data)
+
+
+   parser = CV()
+   parser.feed(open(sys.argv[1], encoding="utf-8").read())
+   parser.flush()
+   text = "\n".join(parser.lines).strip() + "\n"
+   text = re.sub(r"\n{3,}", "\n\n", text)
+   assert "\u2014" not in text, "em dash in output"
+   open(sys.argv[2], "w", encoding="utf-8").write(text)
+   print(f"{len(text.split())} words, {text.count(chr(10))} lines")
+   ```
 
 Tell the user the folder and file name, and anything the base itself needs fixing, for example an empty `<a href=""></a>` anchor. Report a base CV problem once per run, not once per role.
 
@@ -220,7 +309,7 @@ For each role, return in this order and nothing more:
 1. One line: role, company, and the angle in a few words.
 2. The CV change list.
 3. One line: the unevidenced requirement, or that there is none.
-4. One line: the role folder and CV file built, and whether the render checked out.
+4. One line: the role folder, the CV file and its paste-ready `.txt` built, and whether the render checked out.
 5. The cover letter draft plus one line naming the letter file and whether its render checked out, or one line saying the letter was skipped.
 6. The salary number, range and floor, with one line of reasoning.
 7. One line: the next action, normally opening the files and exporting them to PDF into the same role folder.

@@ -11,7 +11,7 @@
 ## Setup, 6 steps
 
 1. **Create the tracker** in Notion with these fields: `Company` (title), `Role` (text), `Link` (url), `Status` (select: Not applied, Ready to apply, Personalize, Passed), `Match` (number), `Why` (text), `Killer` (text), `Notes` (text).
-2. **Build your base files** as plain HTML: `BASE CV.html` and `BASE Cover Letter.html`. Skills and tools are `<span class="chip">` elements, the cover letter placeholders carry `class="fill"`. The tailor skill expects those class names.
+2. **Build your base files** as plain HTML: `BASE CV.html` and `BASE Cover Letter.html`. Skills and tools are `<span class="chip">` elements, the cover letter placeholders carry `class="fill"`. The tailor skill expects those class names. Add a hidden comma after every chip except the last (see ATS notes below).
 3. **Write a voice profile** as a Notion page: 2 or 3 of your own texts plus a short list of do and don't.
 4. **Fill every placeholder** in the 3 `SKILL.md` files (table below).
 5. **Connect** Notion, Gmail (for LinkedIn alerts), Google Drive (for the base CV) and a folder on your computer.
@@ -36,6 +36,22 @@
 | `[CORE SKILL AREA 1]`, `[CORE SKILL AREA 2 AND 3]` | The 2 scoring categories tied to your field |
 | Watchlist and job board sections | Your own companies and boards |
 | `[YOUR SIGNATURE ASIDE EXAMPLES]` | Habits in your writing worth protecting |
+
+## ATS notes
+
+- **Line breaks:** a PDF stores text line by line, so copying from it breaks sentences at every wrap. The tailor skill also writes a plain `.txt` with whole paragraphs, for application form boxes.
+- **Chip separators:** chips sitting on one line come out as "Lottie Files Figma Weave" in pasted text. A transparent comma after each chip fixes that without changing the layout.
+- **Honest limit:** I tested this by exporting a PDF with Chromium and reading it with `pdftotext`. I did not test it against any specific ATS, and hidden punctuation could in theory be flagged by a tool that hates hidden text.
+
+```css
+.chip{position:relative}
+.chip .sep{position:absolute;right:4pt;top:0;line-height:var(--chip-h);white-space:nowrap;color:transparent}
+```
+
+```html
+<span class="chip">Figma<span class="sep">,</span></span>
+<span class="chip">Gemini</span> <!-- last chip: no separator -->
+```
 
 ## Notes
 
